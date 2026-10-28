@@ -39,6 +39,8 @@
   #status { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 4px; font-weight: bold; pointer-events: none; }
   #toast { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(15,118,110,.95); padding: 6px 14px; border-radius: 6px; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity .25s; }
   #toast.show { opacity: 1; }
+
+  /* ---- ventana del diseñador de puertas ---- */
   .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 100; }
   .modal.open { display: flex; }
   .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; width: min(920px, 96vw); max-height: 94vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
@@ -55,12 +57,13 @@
 </style>
 </head>
 <body>
+
 <div id="topbar">
   <div id="level-wrap">
     <label>Y</label>
-    <button onclick="nudgeLevel(-1)">−</button>
+    <button onclick="nudgeLevel(-1)" title="Bajar 1 m">−</button>
     <input id="level-input" type="number" step="0.5" value="0" onchange="changeLevel(this.value)" oninput="changeLevel(this.value)">
-    <button onclick="nudgeLevel(1)">+</button>
+    <button onclick="nudgeLevel(1)" title="Subir 1 m">+</button>
   </div>
   <div class="separator"></div>
   <button id="btn-sala" class="active" onclick="setTool('sala')">⬛ Suelo</button>
@@ -69,58 +72,92 @@
   <button id="btn-rampa" onclick="setTool('rampa')">📐 Rampa</button>
   <button id="btn-escalera" onclick="setTool('escalera')">🪜 Escalera</button>
   <button id="btn-pared" onclick="setTool('pared')">📏 Muro</button>
-  <button id="btn-bloque" onclick="setTool('bloque')">🧱 Bloques</button>
-  <label id="block-h-wrap" style="display:none;color:#cbd5e1;font-size:12px;">alto <input id="block-h" type="number" min="0.5" step="0.5" value="4" style="width:52px;"> m</label>
+  <button id="btn-bloque" onclick="setTool('bloque')" title="Pinta celdas de 10×10 cm. Pintar sobre un bloque existente le cambia la altura. Shift+clic: borrar">🧱 Bloques</button>
+  <label id="block-h-wrap" style="display:none; color:#cbd5e1; font-size:12px;">alto <input id="block-h" type="number" min="0.5" step="0.5" value="4" style="width:52px;"> m</label>
   <button id="btn-puerta" onclick="setTool('puerta')">🚪 Puerta</button>
-  <button onclick="openDoorDesigner()" style="background:#1e3a5f;border-color:#3b82f6;">📐 Diseñar puerta</button>
+  <button onclick="openDoorDesigner()" title="Definir el espacio exacto de la puerta" style="background:#1e3a5f;border-color:#3b82f6;">📐 Diseñar puerta</button>
   <button id="btn-borrar" onclick="setTool('borrar')">🗑️ Borrar</button>
   <div class="separator"></div>
-  <button id="btn-sel" onclick="setTool('sel')">🖱️ Seleccionar</button>
-  <button id="btn-del-sel" class="danger" onclick="deleteSelected()" style="display:none;">🗑️ Eliminar</button>
+  <button id="btn-sel" onclick="setTool('sel')" title="Clic: seleccionar · Shift+clic: añadir/quitar · Arrastrar: caja · Ctrl+clic desde cualquier herramienta">🖱️ Seleccionar</button>
+  <button id="btn-del-sel" class="danger" onclick="deleteSelected()" title="Supr" style="display:none;">🗑️ Eliminar selección</button>
   <div class="separator"></div>
-  <button onclick="finishDraw()" id="btn-finish" style="display:none;background:#0f766e;">✅ Terminar</button>
-  <button id="btn-undo" onclick="undo()">↩️</button>
-  <button id="btn-redo" onclick="redo()">↪️</button>
-  <button onclick="newMap()" class="danger">📄 Nuevo</button>
-  <button onclick="exportJSON()" style="background:#0f766e;border-color:#0d9488;">💾 JSON</button>
-  <button onclick="downloadJSON()" style="background:#0f766e;border-color:#0d9488;">⬇️ mapa.json</button>
-  <button onclick="document.getElementById('file-import').click()">📂</button>
+  <button onclick="finishDraw()" id="btn-finish" style="display:none; background:#0f766e;">✅ Terminar Trazo</button>
+  <button id="btn-undo" onclick="undo()" title="Ctrl+Z">↩️ Deshacer</button>
+  <button id="btn-redo" onclick="redo()" title="Ctrl+Y / Ctrl+Shift+Z">↪️ Rehacer</button>
+  <button onclick="newMap()" class="danger" title="Borra todo el mapa">📄 Nuevo</button>
+  <button onclick="exportJSON()" style="background: #0f766e; border-color: #0d9488;">💾 Copiar JSON</button>
+  <button onclick="downloadJSON()" style="background: #0f766e; border-color: #0d9488;">⬇️ mapa.json</button>
+  <button onclick="document.getElementById('file-import').click()">📂 Importar</button>
   <input type="file" id="file-import" accept=".json,application/json" style="display:none" onchange="importJSON(this)">
-  <button onclick="resetView()" style="background:#475569;">🔍</button>
+  <button onclick="resetView()" style="background: #475569;">🔍 Centrar</button>
 </div>
+
 <div id="canvas-container">
   <canvas id="cv"></canvas>
   <div id="hud">X: 0, Z: 0 | Zoom: 100%</div>
-  <div id="hint">Shift+clic multi · caja selección · Supr borrar · Ctrl+Z deshacer</div>
+  <div id="hint">Shift+clic: multi-selección · Arrastrar con Seleccionar: caja · Supr: borrar selección · Esc: cancelar<br>Ctrl+Z / Y: deshacer / rehacer · Flechas: mover · Ctrl+D: duplicar · Espacio+arrastrar: desplazar</div>
   <div id="status">Nivel: 0 | Herramienta: Suelo</div>
   <div id="toast"></div>
 </div>
-<div id="properties"><div style="color:#64748b;margin:30px auto;text-align:center;">Selecciona un elemento.</div></div>
+
+<div id="properties">
+  <div style="color: #64748b; display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 30px;">Selecciona un elemento.</div>
+</div>
+
+<!-- ============ VENTANA: DISEÑADOR DE PUERTAS ============ -->
 <div class="modal" id="door-modal" onmousedown="if(event.target===this)closeDoorDesigner()">
   <div class="modal-box">
-    <div class="modal-head"><b>🚪 Diseñador de puertas</b><button onclick="closeDoorDesigner()">✕</button></div>
+    <div class="modal-head">
+      <b>🚪 Diseñador de puertas — define la abertura exacta</b>
+      <button onclick="closeDoorDesigner()">✕ Cerrar</button>
+    </div>
     <div class="modal-body">
       <div class="modal-left">
-        <div class="field-group full"><label>Tipo</label><div class="row-inputs"><select id="dd-type" style="flex:1" onchange="ddSelectType(this.value)"></select><button onclick="ddNew()">+</button><button onclick="ddDuplicate()">⧉</button><button class="danger" onclick="ddDelete()">🗑</button></div></div>
+        <div class="field-group full">
+          <label>Tipo (★ = el que usa la herramienta Puerta)</label>
+          <div class="row-inputs">
+            <select id="dd-type" style="flex:1" onchange="ddSelectType(this.value)"></select>
+            <button onclick="ddNew()" title="Nuevo tipo">＋</button>
+            <button onclick="ddDuplicate()" title="Duplicar">⧉</button>
+            <button class="danger" onclick="ddDelete()" title="Eliminar tipo">🗑</button>
+          </div>
+        </div>
         <div class="field-group full"><label>Nombre</label><input type="text" data-dd="nombre" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Ancho</label><input type="number" data-dd="w" step="0.05" min="0.3" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Alto</label><input type="number" data-dd="h" step="0.05" min="0.3" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Alféizar</label><input type="number" data-dd="sill" step="0.05" min="0" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Grosor</label><input type="number" data-dd="fw" step="0.01" min="0.02" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Prof.</label><input type="number" data-dd="depth" step="0.05" min="0.1" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Ángulo</label><input type="number" data-dd="angle" step="5" min="0" max="120" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Hoja</label><select data-dd="panel" onchange="ddField(this)"><option value="single">Simple</option><option value="double">Doble</option><option value="none">Sin hoja</option></select></div>
-        <div class="field-group"><label>Bisagra</label><select data-dd="hinge" onchange="ddField(this)"><option value="left">Izq</option><option value="right">Der</option></select></div>
-        <div class="field-group"><label>Apertura</label><select data-dd="swing" onchange="ddField(this)"><option value="in">In</option><option value="out">Out</option></select></div>
+        <div class="field-group"><label>Ancho de la abertura (m)</label><input type="number" data-dd="w" step="0.05" min="0.3" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Alto de la abertura (m)</label><input type="number" data-dd="h" step="0.05" min="0.3" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Alféizar (altura del borde inferior)</label><input type="number" data-dd="sill" step="0.05" min="0" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Grosor del marco</label><input type="number" data-dd="fw" step="0.01" min="0.02" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Profundidad del marco</label><input type="number" data-dd="depth" step="0.05" min="0.1" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Ángulo de apertura (°)</label><input type="number" data-dd="angle" step="5" min="0" max="120" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Hoja</label>
+          <select data-dd="panel" onchange="ddField(this)">
+            <option value="single">Simple</option><option value="double">Doble</option><option value="none">Sin hoja (arco)</option>
+          </select></div>
+        <div class="field-group"><label>Bisagra</label>
+          <select data-dd="hinge" onchange="ddField(this)"><option value="left">Izquierda</option><option value="right">Derecha</option></select></div>
+        <div class="field-group"><label>Apertura</label>
+          <select data-dd="swing" onchange="ddField(this)"><option value="in">Hacia adentro</option><option value="out">Hacia afuera</option></select></div>
+        <div class="field-group full" style="color:#64748b;font-size:11px;">
+          Las medidas se copian a cada puerta que coloques, así que cada una puede quedar distinta. Con «Aplicar a las puertas de este tipo» cambias de golpe todas las ya colocadas.
+        </div>
       </div>
       <div class="modal-right"><canvas id="dd-canvas" width="640" height="400"></canvas></div>
     </div>
-    <div class="modal-foot"><span id="dd-msg"></span><div class="row-inputs"><button onclick="ddApplySelected()">Aplicar sel.</button><button onclick="ddApplyAll()">Aplicar tipo</button><button onclick="ddUse()" style="background:#0f766e;">✅ Usar</button></div></div>
+    <div class="modal-foot">
+      <span id="dd-msg"></span>
+      <div class="row-inputs" style="flex-wrap:wrap;">
+        <button onclick="ddApplySelected()">Aplicar a la puerta seleccionada</button>
+        <button onclick="ddApplyAll()">Aplicar a las puertas de este tipo</button>
+        <button onclick="ddUse()" style="background:#0f766e;border-color:#0d9488;">✅ Usar para nuevas puertas</button>
+      </div>
+    </div>
   </div>
 </div>
+
 <script src="./editor-1.js"></script>
 <script src="./editor-2.js"></script>
 <script src="./editor-3.js"></script>
 <script src="./editor-4.js"></script>
+
 </body>
 </html>
