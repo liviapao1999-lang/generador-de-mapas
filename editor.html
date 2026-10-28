@@ -103,21 +103,37 @@
       <div class="modal-left">
         <div class="field-group full"><label>Tipo</label><div class="row-inputs"><select id="dd-type" style="flex:1" onchange="ddSelectType(this.value)"></select><button onclick="ddNew()">+</button><button onclick="ddDuplicate()">⧉</button><button class="danger" onclick="ddDelete()">🗑</button></div></div>
         <div class="field-group full"><label>Nombre</label><input type="text" data-dd="nombre" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Ancho</label><input type="number" data-dd="w" step="0.05" min="0.3" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Alto</label><input type="number" data-dd="h" step="0.05" min="0.3" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Alféizar</label><input type="number" data-dd="sill" step="0.05" min="0" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Grosor</label><input type="number" data-dd="fw" step="0.01" min="0.02" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Prof.</label><input type="number" data-dd="depth" step="0.05" min="0.1" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Ángulo</label><input type="number" data-dd="angle" step="5" min="0" max="120" oninput="ddField(this)"></div>
-        <div class="field-group"><label>Hoja</label><select data-dd="panel" onchange="ddField(this)"><option value="single">Simple</option><option value="double">Doble</option><option value="none">Sin hoja</option></select></div>
-        <div class="field-group"><label>Bisagra</label><select data-dd="hinge" onchange="ddField(this)"><option value="left">Izq</option><option value="right">Der</option></select></div>
-        <div class="field-group"><label>Apertura</label><select data-dd="swing" onchange="ddField(this)"><option value="in">In</option><option value="out">Out</option></select></div>
+        <div class="field-group"><label>Ancho de la abertura (m)</label><input type="number" data-dd="w" step="0.05" min="0.3" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Alto de la abertura (m)</label><input type="number" data-dd="h" step="0.05" min="0.3" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Alféizar (altura del borde inferior)</label><input type="number" data-dd="sill" step="0.05" min="0" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Grosor del marco</label><input type="number" data-dd="fw" step="0.01" min="0.02" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Profundidad del marco</label><input type="number" data-dd="depth" step="0.05" min="0.1" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Ángulo de apertura (°)</label><input type="number" data-dd="angle" step="5" min="0" max="120" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Hoja</label>
+          <select data-dd="panel" onchange="ddField(this)">
+            <option value="single">Simple</option><option value="double">Doble</option><option value="none">Sin hoja (arco)</option>
+          </select></div>
+        <div class="field-group"><label>Bisagra</label>
+          <select data-dd="hinge" onchange="ddField(this)"><option value="left">Izquierda</option><option value="right">Derecha</option></select></div>
+        <div class="field-group"><label>Apertura</label>
+          <select data-dd="swing" onchange="ddField(this)"><option value="in">Hacia adentro</option><option value="out">Hacia afuera</option></select></div>
+        <div class="field-group full" style="color:#64748b;font-size:11px;">
+          Las medidas se copian a cada puerta que coloques, así que cada una puede quedar distinta. Con «Aplicar a las puertas de este tipo» cambias de golpe todas las ya colocadas.
+        </div>
       </div>
       <div class="modal-right"><canvas id="dd-canvas" width="640" height="400"></canvas></div>
     </div>
-    <div class="modal-foot"><span id="dd-msg"></span><div class="row-inputs"><button onclick="ddApplySelected()">Aplicar</button><button onclick="ddApplyAll()">Tipo</button><button onclick="ddUse()" style="background:#0f766e;">✅ Usar</button></div></div>
+    <div class="modal-foot">
+      <span id="dd-msg"></span>
+      <div class="row-inputs" style="flex-wrap:wrap;">
+        <button onclick="ddApplySelected()">Aplicar a la puerta seleccionada</button>
+        <button onclick="ddApplyAll()">Aplicar a las puertas de este tipo</button>
+        <button onclick="ddUse()" style="background:#0f766e;border-color:#0d9488;">✅ Usar para nuevas puertas</button>
+      </div>
+    </div>
   </div>
 </div>
+
 <script src="./editor-boot.js"></script>
 </body>
 </html>
