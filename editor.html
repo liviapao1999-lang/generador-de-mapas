@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Editor de Castillos PRO v21</title>
+<style>
+  :root { --bg: #0f1115; --panel: #181b21; --border: #2c313c; --text: #e2e8f0; --primary: #3b82f6; --accent: #f59e0b; --danger: #ef4444; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--text); font: 13px/1.5 system-ui, sans-serif; overflow: hidden; user-select: none; }
+  #topbar { display: flex; gap: 6px; padding: 8px; background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; z-index: 10; }
+  button, input, select { background: #222730; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; font: inherit; outline: none; }
+  button { cursor: pointer; font-weight: bold; transition: all 0.1s; }
+  button:hover { background: #2c333e; }
+  button:disabled { opacity: .35; cursor: default; }
+  button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  button.danger { background: #351a1a; border-color: var(--danger); color: #fca5a5; }
+  button.danger:hover { background: var(--danger); color: #fff; }
+  .separator { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+  #level-input { background: #0f766e; color: white; font-weight: bold; border-color: #0d9488; width: 70px; text-align: center; }
+  #level-wrap { display: flex; align-items: center; gap: 4px; background: #0f766e; border: 1px solid #0d9488; border-radius: 6px; padding: 2px 6px; }
+  #level-wrap label { color: white; font-weight: bold; font-size: 12px; white-space: nowrap; }
+  #level-wrap button { background: #0d9488; border: none; color: white; padding: 2px 8px; font-size: 14px; line-height: 1; }
+  #level-wrap button:hover { background: #14b8a6; }
+  #canvas-container { flex: 1; position: relative; overflow: hidden; cursor: grab; }
+  #canvas-container:active { cursor: grabbing; }
+  #canvas-container.painting { cursor: crosshair; }
+  #cv { display: block; width: 100%; height: 100%; }
+  #properties { background: var(--panel); border-top: 1px solid var(--border); padding: 10px; display: flex; flex-wrap: wrap; gap: 16px; min-height: 130px; align-items: flex-start; z-index: 10; overflow-y: auto; }
+  .field-group { display: flex; flex-direction: column; gap: 4px; }
+  .field-group label { font-size: 10px; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
+  .field-group input { width: 70px; padding: 4px 8px; }
+  .field-group input[type="text"] { width: 140px; }
+  .field-group select { width: 120px; padding: 4px 8px; }
+  .row-inputs { display: flex; gap: 8px; align-items: center; }
+  #hud { position: absolute; bottom: 10px; left: 10px; color: #64748b; pointer-events: none; font-family: monospace; }
+  #hint { position: absolute; bottom: 10px; right: 10px; color: #475569; pointer-events: none; font-size: 11px; text-align: right; }
+  #status { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 4px; font-weight: bold; pointer-events: none; }
+  #toast { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(15,118,110,.95); padding: 6px 14px; border-radius: 6px; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity .25s; }
+  #toast.show { opacity: 1; }
+
+  /* ---- ventana del diseñador de puertas ---- */
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal.open { display: flex; }
+  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; width: min(920px, 96vw); max-height: 94vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+  .modal-head, .modal-foot { padding: 10px 14px; display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .modal-head { border-bottom: 1px solid var(--border); font-size: 14px; }
+  .modal-foot { border-top: 1px solid var(--border); }
+  .modal-body { display: flex; gap: 16px; padding: 12px 14px; overflow: auto; flex-wrap: wrap; }
+  .modal-left { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 14px; flex: 1; min-width: 300px; align-content: start; }
+  .modal-left .full { grid-column: 1 / -1; }
+  .modal-left input, .modal-left select { width: 100%; padding: 5px 8px; }
+  .modal-right { flex: 1.3; min-width: 320px; }
+  #dd-canvas { display: block; width: 100%; height: auto; background: #0b0d11; border: 1px solid var(--border); border-radius: 8px; }
+  #dd-msg { color: #5eead4; font-size: 12px; min-height: 16px; }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div id="level-wrap">
+    <label>Y</label>
+    <button onclick="nudgeLevel(-1)" title="Bajar 1 m">−</button>
+    <input id="level-input" type="number" step="0.5" value="0" onchange="changeLevel(this.value)" oninput="changeLevel(this.value)">
+    <button onclick="nudgeLevel(1)" title="Subir 1 m">+</button>
+  </div>
+  <div class="separator"></div>
+  <button id="btn-sala" class="active" onclick="setTool('sala')">⬛ Suelo</button>
+  <button id="btn-poly" onclick="setTool('poly')">⬡ Polilínea</button>
+  <button id="btn-hueco" onclick="setTool('hueco')" style="color:#ef4444;">🕳️ Hueco</button>
+  <button id="btn-rampa" onclick="setTool('rampa')">📐 Rampa</button>
+  <button id="btn-escalera" onclick="setTool('escalera')">🪜 Escalera</button>
+  <button id="btn-pared" onclick="setTool('pared')">📏 Muro</button>
+  <button id="btn-bloque" onclick="setTool('bloque')" title="Pinta celdas de 10×10 cm. Pintar sobre un bloque existente le cambia la altura. Shift+clic: borrar">🧱 Bloques</button>
+  <label id="block-h-wrap" style="display:none; color:#cbd5e1; font-size:12px;">alto <input id="block-h" type="number" min="0.5" step="0.5" value="4" style="width:52px;"> m</label>
+  <button id="btn-puerta" onclick="setTool('puerta')">🚪 Puerta</button>
+  <button onclick="openDoorDesigner()" title="Definir el espacio exacto de la puerta" style="background:#1e3a5f;border-color:#3b82f6;">📐 Diseñar puerta</button>
+  <button id="btn-borrar" onclick="setTool('borrar')">🗑️ Borrar</button>
+  <div class="separator"></div>
+  <button id="btn-sel" onclick="setTool('sel')" title="Clic: seleccionar · Shift+clic: añadir/quitar · Arrastrar: caja · Ctrl+clic desde cualquier herramienta">🖱️ Seleccionar</button>
+  <button id="btn-del-sel" class="danger" onclick="deleteSelected()" title="Supr" style="display:none;">🗑️ Eliminar selección</button>
+  <div class="separator"></div>
+  <button onclick="finishDraw()" id="btn-finish" style="display:none; background:#0f766e;">✅ Terminar Trazo</button>
+  <button id="btn-undo" onclick="undo()" title="Ctrl+Z">↩️ Deshacer</button>
+  <button id="btn-redo" onclick="redo()" title="Ctrl+Y / Ctrl+Shift+Z">↪️ Rehacer</button>
+  <button onclick="newMap()" class="danger" title="Borra todo el mapa">📄 Nuevo</button>
+  <button onclick="exportJSON()" style="background: #0f766e; border-color: #0d9488;">💾 Copiar JSON</button>
+  <button onclick="downloadJSON()" style="background: #0f766e; border-color: #0d9488;">⬇️ mapa.json</button>
+  <button onclick="document.getElementById('file-import').click()">📂 Importar</button>
+  <input type="file" id="file-import" accept=".json,application/json" style="display:none" onchange="importJSON(this)">
+  <button onclick="resetView()" style="background: #475569;">🔍 Centrar</button>
+</div>
+
+<div id="canvas-container">
+  <canvas id="cv"></canvas>
+  <div id="hud">X: 0, Z: 0 | Zoom: 100%</div>
+  <div id="hint">Shift+clic: multi-selección · Arrastrar con Seleccionar: caja · Supr: borrar selección · Esc: cancelar<br>Ctrl+Z / Y: deshacer / rehacer · Flechas: mover · Ctrl+D: duplicar · Espacio+arrastrar: desplazar</div>
+  <div id="status">Nivel: 0 | Herramienta: Suelo</div>
+  <div id="toast"></div>
+</div>
+
+<div id="properties">
+  <div style="color: #64748b; display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 30px;">Selecciona un elemento.</div>
+</div>
+
+<!-- ============ VENTANA: DISEÑADOR DE PUERTAS ============ -->
+<div class="modal" id="door-modal" onmousedown="if(event.target===this)closeDoorDesigner()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <b>🚪 Diseñador de puertas — define la abertura exacta</b>
+      <button onclick="closeDoorDesigner()">✕ Cerrar</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-left">
+        <div class="field-group full">
+          <label>Tipo (★ = el que usa la herramienta Puerta)</label>
+          <div class="row-inputs">
+            <select id="dd-type" style="flex:1" onchange="ddSelectType(this.value)"></select>
+            <button onclick="ddNew()" title="Nuevo tipo">＋</button>
+            <button onclick="ddDuplicate()" title="Duplicar">⧉</button>
+            <button class="danger" onclick="ddDelete()" title="Eliminar tipo">🗑</button>
+          </div>
+        </div>
+        <div class="field-group full"><label>Nombre</label><input type="text" data-dd="nombre" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Ancho de la abertura (m)</label><input type="number" data-dd="w" step="0.05" min="0.3" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Alto de la abertura (m)</label><input type="number" data-dd="h" step="0.05" min="0.3" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Alféizar (altura del borde inferior)</label><input type="number" data-dd="sill" step="0.05" min="0" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Grosor del marco</label><input type="number" data-dd="fw" step="0.01" min="0.02" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Profundidad del marco</label><input type="number" data-dd="depth" step="0.05" min="0.1" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Ángulo de apertura (°)</label><input type="number" data-dd="angle" step="5" min="0" max="120" oninput="ddField(this)"></div>
+        <div class="field-group"><label>Hoja</label>
+          <select data-dd="panel" onchange="ddField(this)">
+            <option value="single">Simple</option><option value="double">Doble</option><option value="none">Sin hoja (arco)</option>
+          </select></div>
+        <div class="field-group"><label>Bisagra</label>
+          <select data-dd="hinge" onchange="ddField(this)"><option value="left">Izquierda</option><option value="right">Derecha</option></select></div>
+        <div class="field-group"><label>Apertura</label>
+          <select data-dd="swing" onchange="ddField(this)"><option value="in">Hacia adentro</option><option value="out">Hacia afuera</option></select></div>
+        <div class="field-group full" style="color:#64748b;font-size:11px;">
+          Las medidas se copian a cada puerta que coloques, así que cada una puede quedar distinta. Con «Aplicar a las puertas de este tipo» cambias de golpe todas las ya colocadas.
+        </div>
+      </div>
+      <div class="modal-right"><canvas id="dd-canvas" width="640" height="400"></canvas></div>
+    </div>
+    <div class="modal-foot">
+      <span id="dd-msg"></span>
+      <div class="row-inputs" style="flex-wrap:wrap;">
+        <button onclick="ddApplySelected()">Aplicar a la puerta seleccionada</button>
+        <button onclick="ddApplyAll()">Aplicar a las puertas de este tipo</button>
+        <button onclick="ddUse()" style="background:#0f766e;border-color:#0d9488;">✅ Usar para nuevas puertas</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const hudEl = document.getElementById('hud');
+const propsEl = document.getElementById('properties');
+const container = document.getElementById('canvas-container');
+const toastEl = document.getElementById('toast');
+const LS_KEY = 'castillo-v20'; // misma clave: el visor 3D (main.js) la lee tal cual
+
+// Cuadrícula: cada celda = 10 cm (0.1 m). Salas, muros y bloques se alinean a celdas completas.
+const GRID = 0.1;
+let scale = 50; // px por metro → cada celda de 10 cm ≈ 5 px
+let offsetX = 0, offsetY = 0;
+let tool = 'sala';
+let activeLevel = 0;
+let data = { rooms: [], walls: [], doors: [], holes: [], blocks: [], doorTypes: [], activeDoorType: null };
+let selected = null;       // foco actual (panel de propiedades)
+let multiSel = [];         // selección múltiple: [{type,id}, ...]
+let isDraggingNew = false;
+let isMovingExisting = false;
+let isBoxSelecting = false;
+let boxSel = null;         // {x0,z0,x1,z1} en coords mundo
+let dragTemp = null;
+let moveStart = { x: 0, z: 0 };
+let moveOrig = null;
+let mouseWorld = { x: 0, z: 0 };
+
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let spacePressed = false;
+
+let currentPoly = [];
+let isDrawingPoly = false;
+let currentWall = [];
+let paintingBlocks = false, blockErase = false, blockChanged = false;
+let isDrawingWall = false;
+
+let currentEditId = null;
+
+const W2S = (x, z) => [x * scale + offsetX, -z * scale + offsetY];
+const S2W = (px, py) => [(px - offsetX) / scale, -(py - offsetY) / scale];
+// Alinea a la cuadrícula de 10 cm (evita ruido de coma flotante)
+const snap = (v) => +(Math.round(v / GRID) * GRID).toFixed(1);
+// Celda ocupada por el punto (esquina inferior-izquierda de la celda)
+const cellOf = (v) => +(Math.floor(v / GRID + 1e-9) * GRID).toFixed(1);
+const almost = (a, b, eps = GRID * 1.5) => Math.abs(a - b) <= eps;
+const isLevel = (y) => Math.abs((y || 0) - activeLevel) < 0.5;
+// Opacidad según distancia al nivel activo: 1 en el nivel, se atenúa con la distancia
+const levelAlpha = (y) => {
+  const d = Math.abs((y || 0) - activeLevel);
+  if (d < 0.5) return 1;
+  if (d < 2) return 0.55;
+  if (d < 4) return 0.35;
+  return 0.18;
+};
+// Ratón → mundo (corrige desfase si el tamaño CSS del canvas no coincide 1:1 con su resolución)
+function mouseToWorld(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = rect.width ? (canvas.width / rect.width) : 1;
+  const sy = rect.height ? (canvas.height / rect.height) : 1;
+  return S2W((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
+}
+const el = (id) => document.getElementById(id);
+const uid = (p) => p + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const deep = (o) => JSON.parse(JSON.stringify(o));
+
+function toast(msg) {
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => toastEl.classList.remove('show'), 1400);
+}
+
+// =====================================================================
+//  DATOS, TIPOS DE PUERTA Y NORMALIZACIÓN
+// =====================================================================
+const defaultDoorTypes = () => [
+  { id: 'dt-estandar', nombre: 'Puerta estándar', w: 1.5, h: 3.6, sill: 0, fw: 0.1, depth: 0.5, panel: 'single', hinge: 'left', swing: 'in', angle: 72 },
+  { id: 'dt-doble', nombre: 'Portón doble', w: 3, h: 4, sill: 0, fw: 0.15, depth: 0.5, panel: 'double', hinge: 'left', swing: 'in', angle: 72 },
+  { id: 'dt-arco', nombre: 'Arco abierto', w: 2, h: 3.6, sill: 0, fw: 0.1, depth: 0.5, panel: 'none', hinge: 'left', swing: 'in', angle: 72 },
+  { id: 'dt-postigo', nombre: 'Postigo alto', w: 1, h: 1.2, sill: 1.5, fw: 0.08, depth: 0.5, panel: 'single', hinge: 'left', swing: 'in', angle: 72 },
+];
+
+function normalizeData() {
+  if (!data || typeof data !== 'object') data = {};
+  ['rooms', 'walls', 'doors', 'holes', 'blocks'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
+  data.blocks.forEach(b => { if (!b.id) b.id = uid('b'); });
+  if (!Array.isArray(data.doorTypes) || !data.doorTypes.length) data.doorTypes = defaultDoorTypes();
+  if (!data.doorTypes.some(t => t.id === data.activeDoorType)) data.activeDoorType = data.doorTypes[0].id;
+}
+const activeDoorType = () => data.doorTypes.find(t => t.id === data.activeDoorType) || data.doorTypes[0];
+
+// Parámetros que se copian del tipo a cada puerta colocada
+function doorParams(t) {
+  return { w: t.w, h: t.h, sill: t.sill, fw: t.fw, depth: t.depth, panel: t.panel, hinge: t.hinge, swing: t.swing, angle: t.angle, double: t.panel === 'double', tipo: t.id };
+}
+const doorPanelMode = (d) => d.panel || (d.double ? 'double' : 'single');
+
+// =====================================================================
+//  HISTORIAL (deshacer / rehacer)
+// =====================================================================
+let hist = [], histIdx = -1, lastKey = '', lastTime = 0;
+const snapshot = () => JSON.stringify(data);
+
+function persist() {
+  try { localStorage.setItem(LS_KEY, snapshot()); } catch (e) { /* sin espacio: se ignora */ }
+}
+function updateHistButtons() {
+  el('btn-undo').disabled = histIdx <= 0 && !(isDrawingPoly || isDrawingWall);
+  el('btn-redo').disabled = histIdx >= hist.length - 1;
+}
+// Registra el estado actual. Con la misma `key` en menos de 700 ms se fusiona en un solo paso (teclear un número).
+function commit(key) {
+  const s = snapshot();
+  persist();
+  if (histIdx >= 0 && hist[histIdx] === s) { updateHistButtons(); return; }
+  const now = Date.now();
+  if (key && key === lastKey && now - lastTime < 700 && histIdx > 0) {
+    hist[histIdx] = s;
+  } else {
+    hist.splice(histIdx + 1);
+    hist.push(s);
+    if (hist.length > 300) hist.shift();
+    histIdx = hist.length - 1;
+  }
+  lastKey = key || ''; lastTime = now;
+  updateHistButtons();
+}
+function restore(s) {
+  data = JSON.parse(s); normalizeData();
+  clearSelection();
+  persist(); draw(); updateStatus(); updateHistButtons();
+  if (el('door-modal').classList.contains('open')) ddRefresh();
+}
+function undo() {
+  if (isDrawingPoly && currentPoly.length) { currentPoly.pop(); if (!currentPoly.length) cancelDraw(); draw(); return; }
+  if (isDrawingWall && currentWall.length) { currentWall.pop(); if (!currentWall.length) cancelDraw(); draw(); return; }
+  if (histIdx > 0) { histIdx--; lastKey = ''; restore(hist[histIdx]); toast('↩️ Deshacer'); }
+}
+function redo() {
+  if (histIdx < hist.length - 1) { histIdx++; lastKey = ''; restore(hist[histIdx]); toast('↪️ Rehacer'); }
+}
+
+// =====================================================================
+//  VISTA
+// =====================================================================
+function resize() {
+  canvas.width = container.clientWidth;
+  canvas.height = container.clientHeight;
+  if (offsetX === 0 && offsetY === 0) resetView();
+  draw();
+}
+window.addEventListener('resize', resize);
+
+function bounds() {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  const add = (x, z) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); };
+  data.rooms.forEach(r => r.points ? r.points.forEach(p => add(p.x, p.z)) : (add(r.x0, r.z0), add(r.x1, r.z1)));
+  data.walls.forEach(w => (w.points || []).forEach(p => add(p.x, p.z)));
+  data.holes.forEach(h => { add(h.x0, h.z0); add(h.x1, h.z1); });
+  data.blocks.forEach(b => { add(b.x, b.z); add(b.x + GRID, b.z + GRID); });
+  data.doors.forEach(d => add(d.x, d.z));
+  return isFinite(x0) ? { x0, x1, z0, z1 } : null;
+}
+
+function resetView() {
+  const b = bounds();
+  if (!b) { offsetX = canvas.width / 2; offsetY = canvas.height / 2; scale = 50; }
+  else {
+    const pad = 50, w = Math.max(b.x1 - b.x0, 1), h = Math.max(b.z1 - b.z0, 1);
+    scale = Math.max(10, Math.min(200, Math.min((canvas.width - 2 * pad) / w, (canvas.height - 2 * pad) / h)));
+    offsetX = canvas.width / 2 - ((b.x0 + b.x1) / 2) * scale;
+    offsetY = canvas.height / 2 + ((b.z0 + b.z1) / 2) * scale;
+  }
+  draw();
+}
+
+function changeLevel(val) {
+  const n = parseFloat(val);
+  if (!isFinite(n)) return;
+  activeLevel = n;
+  const inp = el('level-input');
+  if (inp && document.activeElement !== inp) inp.value = activeLevel;
+  clearSelection();
+  draw();
+  updateStatus();
+}
+function nudgeLevel(delta) {
+  changeLevel(activeLevel + delta);
+  el('level-input').value = activeLevel;
+}
+
+container.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const sx = rect.width ? (canvas.width / rect.width) : 1;
+  const sy = rect.height ? (canvas.height / rect.height) : 1;
+  const mouseX = (e.clientX - rect.left) * sx;
+  const mouseY = (e.clientY - rect.top) * sy;
+  const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+  const newScale = Math.max(10, Math.min(200, scale * zoomFactor));
+  offsetX = mouseX - (mouseX - offsetX) * (newScale / scale);
+  offsetY = mouseY - (mouseY - offsetY) * (newScale / scale);
+  scale = newScale;
+  hudEl.textContent = `X: ${(+snap(mouseWorld.x)).toFixed(1)}, Z: ${(+snap(mouseWorld.z)).toFixed(1)} | Zoom: ${Math.round(scale * 10)}%`;
+  draw();
+}, { passive: false });
+container.addEventListener('contextmenu', e => e.preventDefault());
+
+// =====================================================================
+//  TECLADO
+// =====================================================================
+const modalOpen = () => el('door-modal').classList.contains('open');
+
+window.addEventListener('keydown', e => {
+  if (modalOpen()) { if (e.key === 'Escape') closeDoorDesigner(); return; }
+  const a = document.activeElement;
+  const typing = a && ((a.tagName === 'INPUT' && (a.type === 'text' || a.type === 'number')) || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT');
+  const mod = e.ctrlKey || e.metaKey;
+
+  if (mod && e.code === 'KeyZ') { e.preventDefault(); if (typing) a.blur(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.code === 'KeyY') { e.preventDefault(); if (typing) a.blur(); redo(); return; }
+  if (mod && e.code === 'KeyD') { e.preventDefault(); duplicateSelected(); return; }
+  if (typing) return;
+
+  if (e.code === 'Space') { e.preventDefault(); spacePressed = true; container.classList.remove('painting'); }
+  if (e.key === 'Enter' && (isDrawingPoly || isDrawingWall)) finishDraw();
+  if (e.key === 'Escape') {
+    if (isDrawingPoly || isDrawingWall) cancelDraw();
+    else if (selected || multiSel.length) { clearSelection(); draw(); }
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && (selected || multiSel.length)) { e.preventDefault(); deleteSelected(); }
+
+  const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+  if (arrows[e.key] && (selected || multiSel.length)) {
+    e.preventDefault();
+    const k = e.shiftKey ? 1 : GRID; // celda (10 cm) o 1 m con Shift
+    const list = multiSel.length ? multiSel : [selected];
+    list.forEach(s => {
+      const obj = getObj(s);
+      if (obj) applyMove(s, obj, deep(obj), arrows[e.key][0] * k, arrows[e.key][1] * k);
+    });
+    if (selected) { const o = getObj(selected); if (o) syncInputs(o); }
+    draw(); commit('nudge');
+  }
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space') { spacePressed = false; if (tool !== 'sel') container.classList.add('painting'); }
+});
+
+// =====================================================================
+//  HELPERS DE OBJETOS Y GEOMETRÍA
+// =====================================================================
+function getObj(sel) {
+  if (!sel) return null;
+  const arr = sel.type === 'room' ? data.rooms
+    : sel.type === 'wall' ? data.walls
+    : sel.type === 'hole' ? data.holes
+    : sel.type === 'block' ? data.blocks
+    : data.doors;
+  return arr.find(x => x.id === sel.id) || null;
+}
+
+function selKey(s) { return s ? s.type + ':' + s.id : ''; }
+function isInMulti(s) { return !!s && multiSel.some(m => m.type === s.type && m.id === s.id); }
+function isSelectedAny(type, id) {
+  if (selected && selected.type === type && selected.id === id) return true;
+  return multiSel.some(m => m.type === type && m.id === id);
+}
+function clearSelection() {
+  selected = null; multiSel = []; currentEditId = null;
+  updateSelButton(); renderProperties();
+}
+function setSingleSelection(hit) {
+  selected = hit; multiSel = hit ? [hit] : []; currentEditId = null;
+  updateSelButton(); renderProperties();
+}
+function toggleInSelection(hit) {
+  if (!hit) return;
+  const i = multiSel.findIndex(m => m.type === hit.type && m.id === hit.id);
+  if (i >= 0) {
+    multiSel.splice(i, 1);
+    if (selected && selected.type === hit.type && selected.id === hit.id)
+      selected = multiSel.length ? multiSel[multiSel.length - 1] : null;
+  } else {
+    multiSel.push(hit);
+    selected = hit;
+  }
+  currentEditId = null;
+  updateSelButton(); renderProperties();
+}
+function updateSelButton() {
+  const btn = el('btn-del-sel');
+  if (!btn) return;
+  const n = multiSel.length || (selected ? 1 : 0);
+  btn.style.display = n ? 'inline-block' : 'none';
+  btn.textContent = n > 1 ? `🗑️ Eliminar (${n})` : '🗑️ Eliminar selección';
+}
+
+function segDist(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
+  if (len2 === 0) return Math.hypot(px - ax, pz - az);
+  let t = ((px - ax) * dx + (pz - az) * dz) / len2; t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
+}
+function inRect(o, wx, wz) {
+  return wx >= Math.min(o.x0, o.x1) && wx <= Math.max(o.x0, o.x1) && wz >= Math.min(o.z0, o.z1) && wz <= Math.max(o.z0, o.z1);
+}
+function inPoly(pts, wx, wz) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, zi = pts[i].z, xj = pts[j].x, zj = pts[j].z;
+    if (((zi > wz) !== (zj > wz)) && (wx < (xj - xi) * (wz - zi) / (zj - zi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+// Eje de la abertura de la puerta: ax='z' => recta a lo largo de Z; ax='x' => a lo largo de X
+function doorSpan(d) {
+  const w = d.w || 1.5;
+  return d.ax === 'z' ? [d.x, d.z - w / 2, d.x, d.z + w / 2] : [d.x - w / 2, d.z, d.x + w / 2, d.z];
+}
+
+// Prioridad: puertas > huecos > muros > escaleras/rampas > salas.
+// Muros/puertas/huecos: nivel activo primero, si no hay hit se prueban todos.
+// Salas (áreas grandes): solo nivel activo, para no “robar” clics a los muros.
+function pickAt(wx, wz) {
+  const tol = 12 / scale;
+
+  const hitDoor = (onlyActive) => {
+    for (let i = data.doors.length - 1; i >= 0; i--) {
+      const d = data.doors[i]; if (onlyActive && !isLevel(d.y)) continue;
+      const s = doorSpan(d);
+      if (segDist(wx, wz, s[0], s[1], s[2], s[3]) < tol || Math.hypot(d.x - wx, d.z - wz) < 15 / scale) return { type: 'door', id: d.id };
+    }
+    return null;
+  };
+  const hitHole = (onlyActive) => {
+    for (let i = data.holes.length - 1; i >= 0; i--) {
+      const h = data.holes[i]; if (onlyActive && !isLevel(h.y)) continue;
+      if (inRect(h, wx, wz)) return { type: 'hole', id: h.id };
+    }
+    return null;
+  };
+  const hitWall = (onlyActive) => {
+    for (let i = data.walls.length - 1; i >= 0; i--) {
+      const w = data.walls[i]; if (onlyActive && !isLevel(w.y || 0)) continue;
+      const pts = w.points; if (!pts || pts.length < 2) continue;
+      for (let j = 0; j < pts.length - 1; j++) {
+        if (segDist(wx, wz, pts[j].x, pts[j].z, pts[j + 1].x, pts[j + 1].z) < tol) return { type: 'wall', id: w.id };
+      }
+      // Segmento de cierre en muros cerrados
+      if (w.closed && pts.length >= 3) {
+        if (segDist(wx, wz, pts[pts.length - 1].x, pts[pts.length - 1].z, pts[0].x, pts[0].z) < tol) return { type: 'wall', id: w.id };
+      }
+    }
+    return null;
+  };
+  const hitBlock = (onlyActive) => {
+    const cx = cellOf(wx), cz = cellOf(wz);
+    for (let i = data.blocks.length - 1; i >= 0; i--) {
+      const b = data.blocks[i];
+      if (onlyActive && !isLevel(b.y || 0)) continue;
+      if (almost(b.x, cx) && almost(b.z, cz)) return { type: 'block', id: b.id };
+    }
+    return null;
+  };
+  const hitElev = () => {
+    for (let i = data.rooms.length - 1; i >= 0; i--) {
+      const r = data.rooms[i];
+      if (!isLevel(r.y) || (r.type !== 'escalera' && r.type !== 'rampa') || r.points) continue;
+      if (inRect(r, wx, wz)) return { type: 'room', id: r.id };
+    }
+    return null;
+  };
+  const hitRoom = () => {
+    for (let i = data.rooms.length - 1; i >= 0; i--) {
+      const r = data.rooms[i]; if (!isLevel(r.y)) continue;
+      const inside = r.points ? inPoly(r.points, wx, wz) : inRect(r, wx, wz);
+      if (inside) return { type: 'room', id: r.id };
+    }
+    return null;
+  };
+
+  return hitDoor(true) || hitHole(true) || hitWall(true) || hitBlock(true)
+    || hitDoor(false) || hitHole(false) || hitWall(false) || hitBlock(false)
+    || hitElev() || hitRoom();
+}
+
+// Todos los objetos que intersectan la caja de selección (nivel activo prioritario en bloques)
+function pickAllInBox(x0, z0, x1, z1) {
+  const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+  const za = Math.min(z0, z1), zb = Math.max(z0, z1);
+  const hits = [];
+  const inBox = (x, z) => x >= xa && x <= xb && z >= za && z <= zb;
+  const segInBox = (ax, az, bx, bz) => {
+    // cualquier extremo dentro o el segmento cruza la caja (aprox: punto medio)
+    if (inBox(ax, az) || inBox(bx, bz)) return true;
+    const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+    return inBox(mx, mz);
+  };
+  data.doors.forEach(d => { if (isLevel(d.y) && inBox(d.x, d.z)) hits.push({ type: 'door', id: d.id }); });
+  data.holes.forEach(h => {
+    if (!isLevel(h.y)) return;
+    const hx0 = Math.min(h.x0, h.x1), hx1 = Math.max(h.x0, h.x1);
+    const hz0 = Math.min(h.z0, h.z1), hz1 = Math.max(h.z0, h.z1);
+    if (hx1 >= xa && hx0 <= xb && hz1 >= za && hz0 <= zb) hits.push({ type: 'hole', id: h.id });
+  });
+  data.walls.forEach(w => {
+    if (!isLevel(w.y || 0) || !w.points) return;
+    for (let j = 0; j < w.points.length - 1; j++) {
+      if (segInBox(w.points[j].x, w.points[j].z, w.points[j + 1].x, w.points[j + 1].z)) {
+        hits.push({ type: 'wall', id: w.id }); return;
+      }
+    }
+    if (w.closed && w.points.length >= 3) {
+      const a = w.points[w.points.length - 1], b = w.points[0];
+      if (segInBox(a.x, a.z, b.x, b.z)) hits.push({ type: 'wall', id: w.id });
+    }
+  });
+  data.blocks.forEach(b => {
+    if (isLevel(b.y || 0) && b.x + GRID > xa && b.x < xb && b.z + GRID > za && b.z < zb)
+      hits.push({ type: 'block', id: b.id });
+  });
+  data.rooms.forEach(r => {
+    if (!isLevel(r.y)) return;
+    if (r.points) {
+      if (r.points.some(p => inBox(p.x, p.z))) hits.push({ type: 'room', id: r.id });
+    } else {
+      const rx0 = Math.min(r.x0, r.x1), rx1 = Math.max(r.x0, r.x1);
+      const rz0 = Math.min(r.z0, r.z1), rz1 = Math.max(r.z0, r.z1);
+      if (rx1 >= xa && rx0 <= xb && rz1 >= za && rz0 <= zb) hits.push({ type: 'room', id: r.id });
+    }
+  });
+  return hits;
+}
+
+// Mueve `obj` a partir de su copia original `orig` (dx, dz en unidades de mundo)
+function applyMove(sel, obj, orig, dx, dz) {
+  if (obj.points) obj.points = orig.points.map(p => ({ x: p.x + dx, z: p.z + dz }));
+  else if (sel.type === 'door' || sel.type === 'block') { obj.x = orig.x + dx; obj.z = orig.z + dz; }
+  else { obj.x0 = orig.x0 + dx; obj.x1 = orig.x1 + dx; obj.z0 = orig.z0 + dz; obj.z1 = orig.z1 + dz; }
+}
+
+function arrFor(type) {
+  return type === 'room' ? data.rooms
+    : type === 'wall' ? data.walls
+    : type === 'hole' ? data.holes
+    : type === 'block' ? data.blocks
+    : data.doors;
+}
+
+function duplicateSelected() {
+  if (!selected) return;
+  const obj = getObj(selected); if (!obj) return;
+  const c = deep(obj); c.id = uid(selected.type[0]);
+  applyMove(selected, c, deep(obj), 2, -2);
+  if (selected.type === 'block') { c.x = snap(c.x); c.z = snap(c.z); }
+  arrFor(selected.type).push(c);
+  selected = { type: selected.type, id: c.id }; currentEditId = null;
+  renderProperties(); draw(); commit(); toast('Duplicado');
+}
+
+// =====================================================================
+//  DIBUJO
+// =====================================================================
+function draw() {
+  ctx.fillStyle = '#0f1115';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawGrid();
+
+  // 1. Salas (todos los niveles visibles, opacidad según distancia al nivel activo)
+  data.rooms.forEach(r => {
+    const active = isLevel(r.y);
+    ctx.globalAlpha = levelAlpha(r.y);
+    ctx.beginPath();
+    if (r.points && r.points.length > 2) {
+      const [x0, y0] = W2S(r.points[0].x, r.points[0].z);
+      ctx.moveTo(x0, y0);
+      for (let i = 1; i < r.points.length; i++) { const [x, y] = W2S(r.points[i].x, r.points[i].z); ctx.lineTo(x, y); }
+      ctx.closePath();
+    } else {
+      const [x0, y0] = W2S(Math.min(r.x0, r.x1), Math.min(r.z0, r.z1));
+      const [x1, y1] = W2S(Math.max(r.x0, r.x1), Math.max(r.z0, r.z1));
+      ctx.rect(x0, y0, x1 - x0, y1 - y0);
+    }
+    ctx.fillStyle = r.type === 'rampa' ? 'rgba(245, 158, 11, 0.08)' : r.type === 'escalera' ? 'rgba(168, 85, 247, 0.08)' : (r.open ? 'rgba(59, 130, 246, 0.04)' : 'rgba(148, 163, 184, 0.06)');
+    ctx.strokeStyle = r.type === 'rampa' ? '#f59e0b' : r.type === 'escalera' ? '#a855f7' : '#475569';
+    ctx.lineWidth = 1;
+    if (isSelectedAny('room', r.id)) { ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; }
+    ctx.fill(); ctx.stroke();
+
+    // Etiqueta en todos los niveles (más clara en el activo)
+    const cx = r.points ? (r.points.reduce((s, p) => s + p.x, 0) / r.points.length) : (r.x0 + r.x1) / 2;
+    const cz = r.points ? (r.points.reduce((s, p) => s + p.z, 0) / r.points.length) : (r.z0 + r.z1) / 2;
+    const [tx, ty] = W2S(cx, cz);
+    ctx.fillStyle = active ? '#94a3b8' : '#475569';
+    ctx.font = '11px monospace'; ctx.textAlign = 'center';
+    ctx.fillText(`${r.nombre || r.id} (Y:${r.y}${r.y2 != null ? '→' + r.y2 : ''})`, tx, ty);
+    ctx.textAlign = 'left';
+  });
+
+  // 2. Huecos
+  data.holes.forEach(h => {
+    ctx.globalAlpha = levelAlpha(h.y);
+    const [x0, y0] = W2S(Math.min(h.x0, h.x1), Math.min(h.z0, h.z1));
+    const [x1, y1] = W2S(Math.max(h.x0, h.x1), Math.max(h.z0, h.z1));
+    ctx.fillStyle = 'rgba(15, 17, 21, 0.8)';
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.strokeStyle = isSelectedAny('hole', h.id) ? '#3b82f6' : '#ef4444';
+    ctx.setLineDash([5, 5]); ctx.lineWidth = 2; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); ctx.setLineDash([]);
+  });
+
+  // 2b. Bloques (celdas de 10×10 cm; el tono indica la altura)
+  const cellPx = Math.max(1, scale * GRID);
+  data.blocks.forEach(b => {
+    ctx.globalAlpha = levelAlpha(b.y || 0);
+    const [bx, by] = W2S(b.x, b.z + GRID);
+    const k = Math.max(0, Math.min(1, ((b.h || 4) - 0.5) / 7));
+    const selB = isSelectedAny('block', b.id);
+    ctx.fillStyle = `hsl(210, 20%, ${88 - k * 38}%)`;
+    ctx.fillRect(bx + 0.5, by + 0.5, cellPx - 1, cellPx - 1);
+    if (selB) {
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx + 0.5, by + 0.5, cellPx - 1, cellPx - 1);
+    }
+    if (cellPx >= 14) { ctx.fillStyle = '#0f172a'; ctx.font = '9px sans-serif'; ctx.fillText(String(b.h || 4), bx + 2, by + 10); }
+  });
+  ctx.globalAlpha = 1;
+
+  // 3. Muros
+  data.walls.forEach(w => {
+    ctx.globalAlpha = levelAlpha(w.y || 0);
+    const sel = isSelectedAny('wall', w.id);
+    ctx.strokeStyle = sel ? '#3b82f6' : '#cbd5e1';
+    ctx.lineWidth = sel ? 6 : 4;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (w.points && w.points.length > 0) {
+      const [sx, sy] = W2S(w.points[0].x, w.points[0].z);
+      ctx.moveTo(sx, sy);
+      for (let i = 1; i < w.points.length; i++) { const [px, py] = W2S(w.points[i].x, w.points[i].z); ctx.lineTo(px, py); }
+      // Cierra el trazo si el muro está marcado como cerrado
+      if (w.closed && w.points.length >= 3) ctx.closePath();
+    }
+    ctx.stroke();
+  });
+
+  // 4. Puertas: abertura exacta (cian) + arco de giro
+  data.doors.forEach(d => {
+    ctx.globalAlpha = levelAlpha(d.y);
+    const sel = isSelectedAny('door', d.id);
+    const [x, y] = W2S(d.x, d.z);
+    const w = d.w || 1.5, mode = doorPanelMode(d);
+    const s = doorSpan(d);
+    const [ax, ay] = W2S(s[0], s[1]), [bx, by] = W2S(s[2], s[3]);
+    ctx.strokeStyle = sel ? '#3b82f6' : '#22d3ee'; ctx.lineWidth = sel ? 5 : 3; ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+    if (mode !== 'none') {
+      const ang = ((d.angle != null ? d.angle : 72) * Math.PI) / 180;
+      ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 1.5;
+      let startAngle = 0; let swingAngle = d.swing === 'in' ? ang : -ang;
+      if (d.ax === 'z') { startAngle = d.hinge === 'left' ? 0 : Math.PI; if (d.hinge === 'right') swingAngle = -swingAngle; }
+      else { startAngle = d.hinge === 'left' ? Math.PI / 2 : -Math.PI / 2; if (d.hinge === 'right') swingAngle = -swingAngle; }
+      const rad = w * scale;
+      ctx.beginPath(); ctx.arc(x, y, rad, startAngle, startAngle + swingAngle, swingAngle < 0); ctx.stroke();
+      const endX = x + Math.cos(startAngle + swingAngle) * rad;
+      const endY = y + Math.sin(startAngle + swingAngle) * rad;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(endX, endY); ctx.stroke();
+    }
+  });
+  ctx.globalAlpha = 1;
+
+  // --- PREVIEWS ---
+  if (isDrawingPoly && currentPoly.length > 0) {
+    ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    const [sx, sy] = W2S(currentPoly[0].x, currentPoly[0].z);
+    ctx.moveTo(sx, sy);
+    for (let i = 1; i < currentPoly.length; i++) { const [px, py] = W2S(currentPoly[i].x, currentPoly[i].z); ctx.lineTo(px, py); }
+    const [mx, my] = W2S(mouseWorld.x, mouseWorld.z); ctx.lineTo(mx, my);
+    ctx.stroke(); ctx.setLineDash([]);
+    currentPoly.forEach(p => { const [px, py] = W2S(p.x, p.z); ctx.fillStyle = '#3b82f6'; ctx.fillRect(px - 4, py - 4, 8, 8); });
+  }
+
+  if (isDrawingWall && currentWall.length > 0) {
+    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    const [sx, sy] = W2S(currentWall[0].x, currentWall[0].z);
+    ctx.moveTo(sx, sy);
+    for (let i = 1; i < currentWall.length; i++) { const [px, py] = W2S(currentWall[i].x, currentWall[i].z); ctx.lineTo(px, py); }
+    // Si el cursor está cerca del inicio (y hay ≥3 pts), previsualiza el cierre
+    const nearStart = currentWall.length >= 3 && Math.hypot(snap(mouseWorld.x) - currentWall[0].x, snap(mouseWorld.z) - currentWall[0].z) <= GRID * 1.5;
+    if (nearStart) {
+      ctx.lineTo(sx, sy);
+      ctx.stroke();
+      ctx.fillStyle = '#22d3ee';
+      ctx.beginPath(); ctx.arc(sx, sy, 7, 0, Math.PI * 2); ctx.fill();
+    } else {
+      const [mx, my] = W2S(mouseWorld.x, mouseWorld.z); ctx.lineTo(mx, my);
+      ctx.stroke();
+    }
+    currentWall.forEach(p => { const [px, py] = W2S(p.x, p.z); ctx.fillStyle = '#ef4444'; ctx.fillRect(px - 3, py - 3, 6, 6); });
+  }
+
+  if (isDraggingNew && dragTemp) {
+    ctx.strokeStyle = tool === 'hueco' ? '#ef4444' : '#3b82f6';
+    ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    const [x, y] = W2S(Math.min(dragTemp.x0, dragTemp.x1), Math.max(dragTemp.z0, dragTemp.z1));
+    ctx.strokeRect(x, y, Math.abs(dragTemp.x1 - dragTemp.x0) * scale, Math.abs(dragTemp.z1 - dragTemp.z0) * scale);
+    ctx.setLineDash([]);
+  }
+
+  // Caja de selección múltiple
+  if (isBoxSelecting && boxSel) {
+    const xa = Math.min(boxSel.x0, boxSel.x1), xb = Math.max(boxSel.x0, boxSel.x1);
+    const za = Math.min(boxSel.z0, boxSel.z1), zb = Math.max(boxSel.z0, boxSel.z1);
+    const [px, py] = W2S(xa, zb);
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.12)';
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.fillRect(px, py, (xb - xa) * scale, (zb - za) * scale);
+    ctx.strokeRect(px, py, (xb - xa) * scale, (zb - za) * scale);
+    ctx.setLineDash([]);
+  }
+}
+
+function drawGrid() {
+  const step = scale * GRID; // px por celda de 10 cm
+  // Celdas de 10 cm
+  if (step >= 4) {
+    ctx.strokeStyle = '#1a1f2a'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    const x0 = offsetX % step;
+    const y0 = offsetY % step;
+    for (let x = x0; x < canvas.width; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); }
+    for (let y = y0; y < canvas.height; y += step) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); }
+    ctx.stroke();
+  }
+  // Líneas mayores cada 1 m
+  const major = scale; // 1 m en px
+  ctx.strokeStyle = '#2a3344'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let x = offsetX % major; x < canvas.width; x += major) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); }
+  for (let y = offsetY % major; y < canvas.height; y += major) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); }
+  ctx.stroke();
+  // Ejes
+  ctx.strokeStyle = '#475569'; ctx.beginPath();
+  ctx.moveTo(offsetX, 0); ctx.lineTo(offsetX, canvas.height);
+  ctx.moveTo(0, offsetY); ctx.lineTo(canvas.width, offsetY);
+  ctx.stroke();
+}
+
+// =====================================================================
+//  INTERACCIÓN PRINCIPAL
+// =====================================================================
+container.addEventListener('mousedown', e => {
+  const [wx, wz] = mouseToWorld(e);
+  const sx = snap(wx), sz = snap(wz);
+
+  if (e.button === 1 || e.button === 2 || spacePressed) { isPanning = true; panStart = { x: e.clientX, y: e.clientY }; return; }
+  if (e.button !== 0) return;
+
+  // Seleccionar: herramienta Seleccionar, o Ctrl/Cmd+clic desde cualquier herramienta
+  if (tool === 'sel' || e.ctrlKey || e.metaKey) {
+    const hit = pickAt(wx, wz);
+    if (e.shiftKey && hit) {
+      // Shift+clic: añadir / quitar de la selección
+      toggleInSelection(hit);
+      draw(); return;
+    }
+    if (hit) {
+      // Clic sobre un objeto: selección simple (o mantener grupo si ya estaba)
+      if (!isInMulti(hit)) setSingleSelection(hit);
+      else { selected = hit; currentEditId = null; renderProperties(); updateSelButton(); }
+      // Preparar movimiento del grupo
+      isMovingExisting = true; moveStart = { x: wx, z: wz };
+      moveOrig = {};
+      (multiSel.length ? multiSel : [hit]).forEach(s => {
+        const o = getObj(s);
+        if (o) moveOrig[selKey(s)] = deep(o);
+      });
+      draw(); return;
+    }
+    // Clic en vacío con herramienta Seleccionar → iniciar caja de selección
+    if (tool === 'sel') {
+      if (!e.shiftKey) clearSelection();
+      isBoxSelecting = true;
+      boxSel = { x0: wx, z0: wz, x1: wx, z1: wz };
+      draw(); return;
+    }
+    clearSelection(); draw(); return;
+  }
+
+  if (tool === 'poly') {
+    if (!isDrawingPoly) { isDrawingPoly = true; currentPoly = []; el('btn-finish').style.display = 'inline-block'; }
+    currentPoly.push({ x: sx, z: sz }); updateHistButtons(); draw(); return;
+  }
+  if (tool === 'bloque') { paintingBlocks = true; blockErase = e.shiftKey; blockChanged = false; paintBlockAt(wx, wz); return; }
+  if (tool === 'pared') {
+    if (!isDrawingWall) { isDrawingWall = true; currentWall = []; el('btn-finish').style.display = 'inline-block'; }
+    // Clic cerca del primer punto (con 3+ puntos) = cerrar la figura y terminar
+    if (currentWall.length >= 3 && Math.hypot(sx - currentWall[0].x, sz - currentWall[0].z) <= GRID * 1.5) {
+      finishDraw(true); return;
+    }
+    currentWall.push({ x: sx, z: sz }); updateHistButtons(); draw(); return;
+  }
+
+  if (tool === 'sala' || tool === 'rampa' || tool === 'escalera' || tool === 'hueco') {
+    isDraggingNew = true;
+    dragTemp = { x0: sx, z0: sz, x1: sx, z1: sz };
+  }
+  else if (tool === 'borrar') {
+    const hit = pickAt(wx, wz);
+    if (hit) { selected = hit; deleteSelected(); }
+    else {
+      const cx0 = cellOf(wx), cz0 = cellOf(wz);
+      const bi = data.blocks.findIndex(b => almost(b.x, cx0) && almost(b.z, cz0) && isLevel(b.y || 0));
+      if (bi >= 0) { data.blocks.splice(bi, 1); draw(); commit(); }
+    }
+  }
+  else if (tool === 'puerta') {
+    // Se pega al muro de trazo o al borde de sala más cercano
+    let minDist = 20 / scale, bestPoint = null, bestAxis = 'z';
+    const bk = data.blocks.find(b => almost(b.x, cellOf(wx)) && almost(b.z, cellOf(wz)) && isLevel(b.y || 0));
+    if (bk) {
+      const has = (x, z) => data.blocks.some(o => almost(o.x, x) && almost(o.z, z) && isLevel(o.y || 0));
+      const nx = (has(bk.x - GRID, bk.z) ? 1 : 0) + (has(bk.x + GRID, bk.z) ? 1 : 0);
+      const nz = (has(bk.x, bk.z - GRID) ? 1 : 0) + (has(bk.x, bk.z + GRID) ? 1 : 0);
+      bestAxis = nx >= nz ? 'x' : 'z';
+      bestPoint = { x: bk.x + GRID / 2, z: bk.z + GRID / 2 };
+      minDist = -1;
+    }
+    for (const w of (bestPoint ? [] : data.walls)) {
+      if (!isLevel(w.y || 0) || !w.points) continue;
+      for (let j = 0; j < w.points.length - 1; j++) {
+        const A = w.points[j], B = w.points[j + 1];
+        const dx = B.x - A.x, dz = B.z - A.z, len2 = dx * dx + dz * dz;
+        if (len2 === 0) continue;
+        let t = ((wx - A.x) * dx + (wz - A.z) * dz) / len2; t = Math.max(0, Math.min(1, t));
+        const cx = A.x + t * dx, cz = A.z + t * dz;
+        const dist = Math.hypot(wx - cx, wz - cz);
+        if (dist < minDist) { minDist = dist; bestPoint = { x: cx, z: cz }; bestAxis = Math.abs(dx) > Math.abs(dz) ? 'x' : 'z'; }
+      }
+    }
+    if (!bestPoint) {
+      for (const r of data.rooms) {
+        if (!isLevel(r.y) || r.points || r.type === 'patio') continue;
+        const x0 = Math.min(r.x0, r.x1), x1 = Math.max(r.x0, r.x1), z0 = Math.min(r.z0, r.z1), z1 = Math.max(r.z0, r.z1);
+        const dx0 = Math.abs(wx - x0); if (dx0 < minDist && wz >= z0 && wz <= z1) { minDist = dx0; bestPoint = { x: x0, z: wz }; bestAxis = 'z'; }
+        const dx1 = Math.abs(wx - x1); if (dx1 < minDist && wz >= z0 && wz <= z1) { minDist = dx1; bestPoint = { x: x1, z: wz }; bestAxis = 'z'; }
+        const dz0 = Math.abs(wz - z0); if (dz0 < minDist && wx >= x0 && wx <= x1) { minDist = dz0; bestPoint = { x: wx, z: z0 }; bestAxis = 'x'; }
+        const dz1 = Math.abs(wz - z1); if (dz1 < minDist && wx >= x0 && wx <= x1) { minDist = dz1; bestPoint = { x: wx, z: z1 }; bestAxis = 'x'; }
+      }
+    }
+    if (bestPoint) {
+      const door = Object.assign({ id: uid('d'), x: bk ? bestPoint.x : snap(bestPoint.x), z: bk ? bestPoint.z : snap(bestPoint.z), ax: bestAxis, y: activeLevel }, doorParams(activeDoorType()));
+      data.doors.push(door);
+      selected = { type: 'door', id: door.id }; currentEditId = null; renderProperties();
+      draw(); commit();
+    }
+  }
+});
+
+container.addEventListener('mousemove', e => {
+  if (isPanning) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = rect.width ? (canvas.width / rect.width) : 1;
+    const sy = rect.height ? (canvas.height / rect.height) : 1;
+    offsetX += (e.clientX - panStart.x) * sx;
+    offsetY += (e.clientY - panStart.y) * sy;
+    panStart = { x: e.clientX, y: e.clientY };
+    draw();
+    return;
+  }
+  const [wx, wz] = mouseToWorld(e);
+  mouseWorld = { x: wx, z: wz };
+  hudEl.textContent = `X: ${(+snap(wx)).toFixed(1)}, Z: ${(+snap(wz)).toFixed(1)} | Zoom: ${Math.round(scale * 10)}%`;
+
+  if (isDrawingPoly || isDrawingWall) draw();
+  if (paintingBlocks) paintBlockAt(wx, wz);
+
+  if (isBoxSelecting && boxSel) {
+    boxSel.x1 = wx; boxSel.z1 = wz; draw(); return;
+  }
+
+  if (isMovingExisting && moveOrig) {
+    const dx = snap(wx) - snap(moveStart.x);
+    const dz = snap(wz) - snap(moveStart.z);
+    const list = multiSel.length ? multiSel : (selected ? [selected] : []);
+    list.forEach(s => {
+      const orig = moveOrig[selKey(s)];
+      const obj = getObj(s);
+      if (orig && obj) applyMove(s, obj, orig, dx, dz);
+    });
+    if (selected) { const o = getObj(selected); if (o) syncInputs(o); }
+    draw();
+  }
+
+  if (isDraggingNew && dragTemp) { dragTemp.x1 = snap(wx); dragTemp.z1 = snap(wz); draw(); }
+});
+
+container.addEventListener('mouseup', e => {
+  if (isPanning) { isPanning = false; return; }
+  if (paintingBlocks) { paintingBlocks = false; if (blockChanged) commit(); return; }
+  if (isBoxSelecting) {
+    isBoxSelecting = false;
+    if (boxSel) {
+      const hits = pickAllInBox(boxSel.x0, boxSel.z0, boxSel.x1, boxSel.z1);
+      if (hits.length) {
+        // Fusionar con selección previa si Shift
+        if (!e.shiftKey) multiSel = [];
+        hits.forEach(h => {
+          if (!multiSel.some(m => m.type === h.type && m.id === h.id)) multiSel.push(h);
+        });
+        selected = multiSel[multiSel.length - 1] || null;
+        currentEditId = null;
+        updateSelButton(); renderProperties();
+        toast(multiSel.length + ' seleccionado(s)');
+      }
+    }
+    boxSel = null; draw(); return;
+  }
+  if (isMovingExisting) {
+    const list = multiSel.length ? multiSel : (selected ? [selected] : []);
+    list.forEach(s => {
+      if (s.type === 'block') {
+        const b = getObj(s);
+        if (b) { b.x = cellOf(b.x + GRID / 2); b.z = cellOf(b.z + GRID / 2); }
+      }
+    });
+    if (selected) { const o = getObj(selected); if (o) syncInputs(o); }
+    isMovingExisting = false; moveOrig = null; commit(); return;
+  }
+  if (!isDraggingNew) return;
+  isDraggingNew = false;
+
+  const x0 = Math.min(dragTemp.x0, dragTemp.x1), x1 = Math.max(dragTemp.x0, dragTemp.x1);
+  const z0 = Math.min(dragTemp.z0, dragTemp.z1), z1 = Math.max(dragTemp.z0, dragTemp.z1);
+  if (x1 - x0 > 0 && z1 - z0 > 0) {
+    const h = blockH();
+    if (tool === 'sala' || tool === 'rampa' || tool === 'escalera') {
+      // Construye el perímetro con celdas de 10 cm (marco de bloques)
+      placeRectBorder(x0, z0, x1, z1, h);
+      const isEsc = tool === 'escalera', isRmp = tool === 'rampa';
+      data.rooms.push({ id: uid('r'), nombre: isEsc ? 'Escalera' : (isRmp ? 'Rampa' : 'Sala'), x0, x1, z0, z1, type: tool, y: activeLevel, y2: (isEsc || isRmp ? activeLevel + 3 : null), dir: '+x', open: false });
+    } else if (tool === 'hueco') {
+      clearRectBlocks(x0, z0, x1, z1);
+      data.holes.push({ id: uid('h'), x0, x1, z0, z1, y: activeLevel });
+    }
+  }
+  dragTemp = null; draw(); commit();
+});
+
+canvas.addEventListener('dblclick', () => { if (isDrawingPoly || isDrawingWall) finishDraw(); });
+
+function paintBlockAt(wx, wz) {
+  const cx = cellOf(wx), cz = cellOf(wz);
+  const i = data.blocks.findIndex(b => almost(b.x, cx) && almost(b.z, cz) && isLevel(b.y || 0));
+  const h = Math.max(0.5, parseFloat(el('block-h').value) || 4);
+  if (blockErase) { if (i >= 0) { data.blocks.splice(i, 1); blockChanged = true; draw(); } return; }
+  if (i >= 0) { if (data.blocks[i].h !== h) { data.blocks[i].h = h; blockChanged = true; draw(); } return; }
+  data.blocks.push({ id: uid('b'), x: cx, z: cz, y: activeLevel, h }); blockChanged = true; draw();
+}
+
+// --- Construcción por celdas (10 cm) ---
+function blockH() { return Math.max(0.5, parseFloat(el('block-h').value) || 4); }
+
+function ensureBlock(cx, cz, h) {
+  cx = cellOf(cx); cz = cellOf(cz);
+  const i = data.blocks.findIndex(b => almost(b.x, cx) && almost(b.z, cz) && isLevel(b.y || 0));
+  if (i >= 0) { data.blocks[i].h = h; return data.blocks[i]; }
+  const b = { id: uid('b'), x: cx, z: cz, y: activeLevel, h };
+  data.blocks.push(b);
+  return b;
+}
+
+// Coloca bloques en el perímetro de un rectángulo [x0,x1) × [z0,z1) alineado a la rejilla
+function placeRectBorder(x0, z0, x1, z1, h) {
+  x0 = cellOf(Math.min(x0, x1)); z0 = cellOf(Math.min(z0, z1));
+  x1 = snap(Math.max(x0 + GRID, Math.max(x0, x1))); // exclusivo en la esquina max
+  z1 = snap(Math.max(z0 + GRID, Math.max(z0, z1)));
+  const xs = [], zs = [];
+  for (let x = x0; x < x1 - 1e-9; x = snap(x + GRID)) xs.push(x);
+  for (let z = z0; z < z1 - 1e-9; z = snap(z + GRID)) zs.push(z);
+  if (!xs.length || !zs.length) return;
+  // bordes superior e inferior
+  xs.forEach(x => { ensureBlock(x, zs[0], h); ensureBlock(x, zs[zs.length - 1], h); });
+  // bordes izquierdo y derecho (sin repetir esquinas)
+  zs.forEach(z => { ensureBlock(xs[0], z, h); ensureBlock(xs[xs.length - 1], z, h); });
+}
+
+// Rasteriza un segmento en celdas (supercover / Bresenham en rejilla)
+function placeLineCells(ax, az, bx, bz, h) {
+  ax = snap(ax); az = snap(az); bx = snap(bx); bz = snap(bz);
+  const dx = Math.abs(bx - ax), dz = Math.abs(bz - az);
+  const steps = Math.max(1, Math.round(Math.max(dx, dz) / GRID));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    ensureBlock(ax + (bx - ax) * t, az + (bz - az) * t, h);
+  }
+}
+
+// Rellena todas las celdas del rectángulo
+function placeRectFill(x0, z0, x1, z1, h) {
+  x0 = cellOf(Math.min(x0, x1)); z0 = cellOf(Math.min(z0, z1));
+  x1 = snap(Math.max(x0 + GRID, Math.max(x0, x1)));
+  z1 = snap(Math.max(z0 + GRID, Math.max(z0, z1)));
+  for (let x = x0; x < x1 - 1e-9; x = snap(x + GRID))
+    for (let z = z0; z < z1 - 1e-9; z = snap(z + GRID))
+      ensureBlock(x, z, h);
+}
+
+// Borra bloques dentro del rectángulo
+function clearRectBlocks(x0, z0, x1, z1) {
+  const xa = Math.min(x0, x1), xb = Math.max(x0, x1);
+  const za = Math.min(z0, z1), zb = Math.max(z0, z1);
+  data.blocks = data.blocks.filter(b => {
+    if (!isLevel(b.y || 0)) return true;
+    return !(b.x >= xa - 1e-9 && b.x < xb - 1e-9 && b.z >= za - 1e-9 && b.z < zb - 1e-9);
+  });
+}
+
+function cancelDraw() {
+  isDrawingPoly = false; currentPoly = []; isDrawingWall = false; currentWall = [];
+  el('btn-finish').style.display = 'none'; updateHistButtons(); draw();
+}
+
+function finishDraw(close) {
+  let changed = false;
+  if (isDrawingPoly) {
+    if (currentPoly.length >= 3) {
+      const h = blockH();
+      // Perímetro del polígono en celdas
+      for (let i = 0; i < currentPoly.length; i++) {
+        const a = currentPoly[i], b = currentPoly[(i + 1) % currentPoly.length];
+        placeLineCells(a.x, a.z, b.x, b.z, h);
+      }
+      data.rooms.push({ id: uid('poly'), nombre: 'Patio Libre', type: 'patio', open: true, points: [...currentPoly], y: activeLevel, y2: null });
+      changed = true;
+    }
+    isDrawingPoly = false; currentPoly = [];
+  }
+  if (isDrawingWall) {
+    // quita puntos repetidos (el doble clic duplica el último) y detecta cierre
+    let pts = currentWall.filter((p, i) => i === 0 || p.x !== currentWall[i - 1].x || p.z !== currentWall[i - 1].z);
+    let closed = close === true;
+    // Si el último punto coincide o está muy cerca del primero → cerrado
+    if (pts.length > 2) {
+      const dClose = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].z - pts[pts.length - 1].z);
+      if (dClose <= GRID * 1.5) { pts.pop(); closed = true; }
+    }
+    if (pts.length >= 2) {
+      const h = blockH();
+      // Construye el muro como cadena de celdas
+      for (let i = 0; i < pts.length - 1; i++) placeLineCells(pts[i].x, pts[i].z, pts[i + 1].x, pts[i + 1].z, h);
+      if (closed && pts.length >= 3) placeLineCells(pts[pts.length - 1].x, pts[pts.length - 1].z, pts[0].x, pts[0].z, h);
+      const w = { id: uid('w'), points: pts, h, y: activeLevel };
+      if (closed && pts.length >= 3) w.closed = true;
+      data.walls.push(w);
+      changed = true;
+    }
+    isDrawingWall = false; currentWall = [];
+  }
+  el('btn-finish').style.display = 'none';
+  draw(); if (changed) commit(); else updateHistButtons();
+}
+
+function setTool(t) {
+  tool = t;
+  container.classList.add('painting');
+  if (spacePressed) container.classList.remove('painting');
+  document.querySelectorAll('#topbar button').forEach(b => b.classList.remove('active'));
+  const btn = el('btn-' + t);
+  if (btn) btn.classList.add('active');
+  if (t !== 'poly' && isDrawingPoly) finishDraw();
+  if (t !== 'pared' && isDrawingWall) finishDraw();
+  el('block-h-wrap').style.display = (t === 'bloque' || t === 'sala' || t === 'pared' || t === 'poly' || t === 'rampa' || t === 'escalera') ? 'inline-block' : 'none';
+  if (t !== 'sel') clearSelection();
+  el('btn-finish').style.display = (isDrawingPoly || isDrawingWall) ? 'inline-block' : 'none';
+  updateStatus();
+}
+
+function updateStatus() {
+  const nombres = { sala: 'Suelo', poly: 'Polilínea', hueco: 'Hueco', rampa: 'Rampa', escalera: 'Escalera', pared: 'Muro', bloque: 'Bloques', puerta: 'Puerta', borrar: 'Borrar', sel: 'Seleccionar' };
+  let txt = `Y: ${activeLevel} | Herramienta: ${nombres[tool]}`;
+  if (tool === 'puerta' && data.doorTypes.length) { const t = activeDoorType(); txt += ` (${t.nombre} ${t.w}×${t.h})`; }
+  statusEl.textContent = txt;
+}
+
+// =====================================================================
+//  PROPIEDADES
+// =====================================================================
+function syncInputs(obj) {
+  propsEl.querySelectorAll('input[data-k]').forEach(i => {
+    if (i === document.activeElement) return;
+    const v = obj[i.dataset.k];
+    if (v !== undefined && v !== null) i.value = v;
+  });
+}
+
+function renderProperties() {
+  if (!selected) {
+    propsEl.innerHTML = '<div style="color: #64748b; display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 30px;">Selecciona un elemento (herramienta Seleccionar o Ctrl+clic) para editarlo.<br><span style="font-size:11px;margin-top:6px;">Shift+clic o arrastra una caja para selección múltiple.</span></div>';
+    currentEditId = null; return;
+  }
+  if (multiSel.length > 1) {
+    propsEl.innerHTML = `
+      <div class="field-group" style="justify-content:center;">
+        <label style="text-transform:none;font-size:13px;color:#e2e8f0;">${multiSel.length} elementos seleccionados</label>
+        <div style="color:#94a3b8;font-size:11px;margin-top:4px;">Shift+clic para añadir/quitar · Supr para eliminar todos</div>
+      </div>
+      <div class="field-group" style="justify-content:flex-end;">
+        <button class="danger" onclick="deleteSelected()">🗑️ Eliminar los ${multiSel.length}</button>
+      </div>`;
+    currentEditId = '__multi__';
+    return;
+  }
+  if (selected.id === currentEditId) return;
+  const obj = getObj(selected);
+  if (!obj) { clearSelection(); return; }
+  currentEditId = selected.id;
+  const T = selected.type, id = obj.id;
+  const num = (label, key, val, step) => `<div class="field-group"><label>${label}</label><input type="number" data-k="${key}" value="${val}" ${step ? `step="${step}"` : ''} oninput="updateProp('${T}','${id}','${key}',this.value)"></div>`;
+  const del = '<div class="field-group" style="justify-content: flex-end;"><button class="danger" onclick="deleteSelected()">Eliminar</button></div>';
+
+  if (T === 'room') {
+    const r = obj;
+    const isPoly = r.points != null;
+    const isElev = r.type === 'rampa' || r.type === 'escalera';
+    propsEl.innerHTML = `
+      <div class="field-group"><label>Nombre</label><input type="text" value="${esc(r.nombre)}" oninput="updateProp('room','${id}','nombre',this.value)"></div>
+      <div class="field-group"><label>Tipo</label><select onchange="updateProp('room','${id}','type',this.value)" ${isPoly ? 'disabled' : ''}>
+        <option value="sala" ${r.type === 'sala' ? 'selected' : ''}>Sala</option><option value="patio" ${r.type === 'patio' ? 'selected' : ''}>Patio</option><option value="rampa" ${r.type === 'rampa' ? 'selected' : ''}>Rampa</option><option value="escalera" ${r.type === 'escalera' ? 'selected' : ''}>Escalera</option>
+      </select></div>
+      ${num('Altura Y', 'y', r.y || 0, 0.5)}
+      ${num('Altura Final Y2', 'y2', r.y2 != null ? r.y2 : '', 0.5)}
+      ${isElev && !isPoly ? `<div class="field-group"><label>Dirección</label><select onchange="updateProp('room','${id}','dir',this.value)">
+        <option value="+x" ${r.dir === '+x' ? 'selected' : ''}>+X</option><option value="-x" ${r.dir === '-x' ? 'selected' : ''}>-X</option><option value="+z" ${r.dir === '+z' ? 'selected' : ''}>+Z</option><option value="-z" ${r.dir === '-z' ? 'selected' : ''}>-Z</option>
+      </select></div>` : ''}
+      ${!isPoly ? `<div class="field-group"><label>X0 / Z0</label><div class="row-inputs"><input type="number" data-k="x0" value="${r.x0}" oninput="updateProp('room','${id}','x0',this.value)"><input type="number" data-k="z0" value="${r.z0}" oninput="updateProp('room','${id}','z0',this.value)"></div></div>
+      <div class="field-group"><label>X1 / Z1</label><div class="row-inputs"><input type="number" data-k="x1" value="${r.x1}" oninput="updateProp('room','${id}','x1',this.value)"><input type="number" data-k="z1" value="${r.z1}" oninput="updateProp('room','${id}','z1',this.value)"></div></div>` : '<div class="field-group" style="justify-content:center; color:#64748b; margin-top:12px;">Polígono Libre</div>'}
+      ${del}`;
+  } else if (T === 'hole') {
+    const h = obj;
+    propsEl.innerHTML = `
+      <div class="field-group"><label>Hueco X0 / Z0</label><div class="row-inputs"><input type="number" data-k="x0" value="${h.x0}" oninput="updateProp('hole','${id}','x0',this.value)"><input type="number" data-k="z0" value="${h.z0}" oninput="updateProp('hole','${id}','z0',this.value)"></div></div>
+      <div class="field-group"><label>Hueco X1 / Z1</label><div class="row-inputs"><input type="number" data-k="x1" value="${h.x1}" oninput="updateProp('hole','${id}','x1',this.value)"><input type="number" data-k="z1" value="${h.z1}" oninput="updateProp('hole','${id}','z1',this.value)"></div></div>
+      ${num('Altura Y', 'y', h.y || 0, 0.5)}
+      ${del}`;
+  } else if (T === 'wall') {
+    const w = obj;
+    propsEl.innerHTML = `${num('Altura H', 'h', w.h, 0.5)}${num('Altura Base Y', 'y', w.y || 0, 0.5)}${del}`;
+  } else if (T === 'block') {
+    const b = obj;
+    propsEl.innerHTML = `
+      <div class="field-group"><label>Celda X / Z</label><div class="row-inputs"><input type="number" data-k="x" value="${b.x}" step="1" oninput="updateProp('block','${id}','x',this.value)"><input type="number" data-k="z" value="${b.z}" step="1" oninput="updateProp('block','${id}','z',this.value)"></div></div>
+      ${num('Altura Y', 'y', b.y || 0, 0.5)}
+      ${num('Alto H (m)', 'h', b.h || 4, 0.5)}
+      ${del}`;
+  } else if (T === 'door') {
+    const d = obj, mode = doorPanelMode(d);
+    const tipos = data.doorTypes.map(t => `<option value="${t.id}" ${t.id === d.tipo ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('');
+    propsEl.innerHTML = `
+      <div class="field-group"><label>Tipo</label><select style="width:150px" onchange="setDoorType('${id}',this.value)"><option value="">(a medida)</option>${tipos}</select></div>
+      <div class="field-group"><label>Pos X / Z</label><div class="row-inputs"><input type="number" data-k="x" value="${d.x}" oninput="updateProp('door','${id}','x',this.value)"><input type="number" data-k="z" value="${d.z}" oninput="updateProp('door','${id}','z',this.value)"></div></div>
+      ${num('Altura Y', 'y', d.y || 0, 0.5)}
+      <div class="field-group"><label>Ancho / Alto</label><div class="row-inputs"><input type="number" data-k="w" value="${d.w || 1.5}" step="0.05" oninput="updateProp('door','${id}','w',this.value)"><input type="number" data-k="h" value="${d.h || 3.6}" step="0.05" oninput="updateProp('door','${id}','h',this.value)"></div></div>
+      ${num('Alféizar', 'sill', d.sill || 0, 0.05)}
+      ${num('Marco', 'fw', d.fw != null ? d.fw : 0.1, 0.01)}
+      ${num('Profundidad', 'depth', d.depth || 0.5, 0.05)}
+      ${num('Ángulo °', 'angle', d.angle != null ? d.angle : 72, 5)}
+      <div class="field-group"><label>Hoja</label><select onchange="updateProp('door','${id}','panel',this.value)"><option value="single" ${mode === 'single' ? 'selected' : ''}>Simple</option><option value="double" ${mode === 'double' ? 'selected' : ''}>Doble</option><option value="none" ${mode === 'none' ? 'selected' : ''}>Sin hoja</option></select></div>
+      <div class="field-group"><label>Bisagra</label><select onchange="updateProp('door','${id}','hinge',this.value)"><option value="left" ${d.hinge === 'left' ? 'selected' : ''}>Izquierda</option><option value="right" ${d.hinge === 'right' ? 'selected' : ''}>Derecha</option></select></div>
+      <div class="field-group"><label>Apertura</label><select onchange="updateProp('door','${id}','swing',this.value)"><option value="in" ${d.swing === 'in' ? 'selected' : ''}>Hacia adentro</option><option value="out" ${d.swing === 'out' ? 'selected' : ''}>Hacia afuera</option></select></div>
+      <div class="field-group" style="justify-content:flex-end;"><button onclick="openDoorDesigner()">📐 Editar tipo…</button></div>
+      ${del}`;
+  }
+}
+
+function setDoorType(id, typeId) {
+  const d = data.doors.find(x => x.id === id); if (!d) return;
+  const t = data.doorTypes.find(x => x.id === typeId);
+  if (t) Object.assign(d, doorParams(t)); else delete d.tipo;
+  currentEditId = null; renderProperties(); draw(); commit();
+}
+
+const STR_KEYS = ['nombre', 'type', 'dir', 'hinge', 'swing', 'double', 'panel'];
+function updateProp(type, id, key, val) {
+  const obj = arrFor(type).find(x => x.id === id);
+  if (!obj) return;
+  if (STR_KEYS.includes(key)) {
+    obj[key] = val;
+    if (type === 'door' && key === 'panel') obj.double = val === 'double';
+    draw(); commit(type + id + key); return;
+  }
+  if (key === 'y2' && val === '') { obj.y2 = null; draw(); commit(type + id + key); return; }
+  if (val === '' || val === '-') return;
+  const n = parseFloat(val);
+  if (!isFinite(n)) return;
+  // Bloques: X/Z alineados a la cuadrícula de 10 cm
+  if (type === 'block' && (key === 'x' || key === 'z')) obj[key] = snap(n);
+  else obj[key] = n;
+  draw(); commit(type + id + key);
+}
+
+function deleteSelected() {
+  const list = multiSel.length ? multiSel.slice() : (selected ? [selected] : []);
+  if (!list.length) return;
+  list.forEach(s => {
+    if (s.type === 'room') data.rooms = data.rooms.filter(x => x.id !== s.id);
+    if (s.type === 'wall') data.walls = data.walls.filter(x => x.id !== s.id);
+    if (s.type === 'door') data.doors = data.doors.filter(x => x.id !== s.id);
+    if (s.type === 'hole') data.holes = data.holes.filter(x => x.id !== s.id);
+    if (s.type === 'block') data.blocks = data.blocks.filter(x => x.id !== s.id);
+  });
+  clearSelection();
+  draw(); commit();
+  toast('Eliminado: ' + list.length);
+}
+
+function newMap() {
+  if (!confirm('¿Borrar todo el mapa y empezar de cero?')) return;
+  data = { rooms: [], walls: [], doors: [], holes: [], blocks: [], doorTypes: defaultDoorTypes(), activeDoorType: null };
+  normalizeData();
+  clearSelection();
+  resetView();
+  updateStatus();
+  commit();
+  toast('📄 Mapa nuevo');
+}
+
+// =====================================================================
+//  IMPORTAR / EXPORTAR
+// =====================================================================
+function exportJSON() {
+  const out = JSON.stringify(data, null, 1);
+  const done = () => { toast('✅ JSON copiado al portapapeles'); console.log(out); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(out).then(done, () => { console.log(out); toast('No se pudo copiar: está en la consola'); });
+  else { console.log(out); toast('No se pudo copiar: está en la consola'); }
+}
+function downloadJSON() {
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'mapa.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function importJSON(input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const j = JSON.parse(rd.result);
+      if (!j || !Array.isArray(j.rooms)) throw new Error('el archivo no tiene "rooms"');
+      data = j; normalizeData();
+      clearSelection(); resetView(); updateStatus(); commit(); toast('📂 Mapa importado');
+    } catch (err) { alert('No se pudo importar: ' + err.message); }
+    input.value = '';
+  };
+  rd.readAsText(f);
+}
+
+function loadLocal() {
+  try { const s = localStorage.getItem(LS_KEY); if (s) data = JSON.parse(s); } catch (e) { /* datos corruptos: se parte de cero */ }
+  normalizeData();
+}
+
+// =====================================================================
+//  VENTANA: DISEÑADOR DE PUERTAS
+// =====================================================================
+let ddTypeId = null;
+const ddType = () => data.doorTypes.find(t => t.id === ddTypeId);
+
+function openDoorDesigner(typeId) {
+  let pick = typeId;
+  if (!pick && selected && selected.type === 'door') { const d = getObj(selected); if (d && d.tipo) pick = d.tipo; }
+  if (!pick || !data.doorTypes.some(t => t.id === pick)) pick = data.activeDoorType;
+  ddTypeId = pick;
+  el('door-modal').classList.add('open');
+  el('dd-msg').textContent = '';
+  ddRefresh();
+}
+function closeDoorDesigner() { el('door-modal').classList.remove('open'); updateStatus(); if (selected) { currentEditId = null; renderProperties(); } }
+
+function ddFillSelect() {
+  el('dd-type').innerHTML = data.doorTypes.map(t => `<option value="${t.id}" ${t.id === ddTypeId ? 'selected' : ''}>${esc(t.nombre)}${t.id === data.activeDoorType ? ' ★' : ''}</option>`).join('');
+}
+function ddRefresh() {
+  ddFillSelect();
+  const t = ddType(); if (!t) return;
+  document.querySelectorAll('#door-modal [data-dd]').forEach(i => { i.value = t[i.dataset.dd] != null ? t[i.dataset.dd] : ''; });
+  ddDraw();
+}
+function ddSelectType(id) { ddTypeId = id; el('dd-msg').textContent = ''; ddRefresh(); }
+function ddField(i) {
+  const t = ddType(); if (!t) return;
+  const k = i.dataset.dd; let v = i.value;
+  if (i.type === 'number') {
+    v = parseFloat(v); if (!isFinite(v)) return;
+    if ((k === 'w' || k === 'h') && v <= 0) return;
+    if (v < 0) return;
+  }
+  t[k] = v;
+  if (k === 'nombre') ddFillSelect();
+  ddDraw(); commit('dd' + t.id + k);
+}
+function ddNew() {
+  const t = { id: uid('dt'), nombre: 'Puerta nueva', w: 1.5, h: 3.6, sill: 0, fw: 0.1, depth: 0.5, panel: 'single', hinge: 'left', swing: 'in', angle: 72 };
+  data.doorTypes.push(t); ddTypeId = t.id; ddRefresh(); commit();
+}
+function ddDuplicate() {
+  const t = ddType(); if (!t) return;
+  const c = Object.assign(deep(t), { id: uid('dt'), nombre: t.nombre + ' (copia)' });
+  data.doorTypes.push(c); ddTypeId = c.id; ddRefresh(); commit();
+}
+function ddDelete() {
+  if (data.doorTypes.length <= 1) { el('dd-msg').textContent = 'Debe quedar al menos un tipo.'; return; }
+  const t = ddType(); if (!t) return;
+  data.doorTypes = data.doorTypes.filter(x => x.id !== t.id);
+  data.doors.forEach(d => { if (d.tipo === t.id) delete d.tipo; });
+  if (data.activeDoorType === t.id) data.activeDoorType = data.doorTypes[0].id;
+  ddTypeId = data.doorTypes[0].id; ddRefresh(); commit();
+}
+function ddUse() {
+  const t = ddType(); if (!t) return;
+  data.activeDoorType = t.id; commit();
+  closeDoorDesigner(); setTool('puerta'); toast(`Puerta activa: ${t.nombre}`);
+}
+function ddApplySelected() {
+  const t = ddType(); const d = selected && selected.type === 'door' ? getObj(selected) : null;
+  if (!d) { el('dd-msg').textContent = 'Selecciona primero una puerta en el mapa (Ctrl+clic).'; return; }
+  Object.assign(d, doorParams(t)); draw(); commit();
+  el('dd-msg').textContent = 'Aplicado a la puerta seleccionada.';
+}
+function ddApplyAll() {
+  const t = ddType(); if (!t) return;
+  const list = data.doors.filter(d => d.tipo === t.id);
+  list.forEach(d => Object.assign(d, doorParams(t)));
+  draw(); commit();
+  el('dd-msg').textContent = list.length ? `Actualizadas ${list.length} puerta(s).` : 'Aún no hay puertas de este tipo.';
+}
+
+// ---- Vista previa: alzado (izquierda) y planta (derecha) ----
+function ddDraw() {
+  const c = el('dd-canvas'), g = c.getContext('2d'), t = ddType(); if (!t) return;
+  const W = c.width, H = c.height;
+  g.clearRect(0, 0, W, H); g.fillStyle = '#0b0d11'; g.fillRect(0, 0, W, H);
+  const w = t.w, h = t.h, sill = t.sill || 0, fw = t.fw != null ? t.fw : 0.1, depth = t.depth || 0.5;
+  const ang = ((t.angle != null ? t.angle : 72) * Math.PI) / 180;
+  const mode = t.panel || 'single';
+  g.font = '12px monospace'; g.textAlign = 'center';
+
+  // ---------- ALZADO ----------
+  const ew = W * 0.6;
+  const margin = 0.8, wallW = w + margin * 2, wallH = sill + h + 0.6;
+  const s = Math.min((ew - 70) / wallW, (H - 80) / wallH);
+  const ox = ew / 2, gy = H - 40;
+  const X = (x) => ox + x * s, Y = (y) => gy - y * s;
+  g.fillStyle = '#64748b'; g.fillText('ALZADO', ew / 2, 16);
+  g.fillStyle = '#3b4252'; g.fillRect(X(-wallW / 2), Y(wallH), wallW * s, wallH * s);          // muro
+  g.fillStyle = '#4a2e15';                                                                         // marco
+  g.fillRect(X(-w / 2 - fw / 2), Y(sill + h + fw / 2), (w + fw) * s, (h + fw / 2) * s);
+  const ix0 = -w / 2 + fw / 2, ix1 = w / 2 - fw / 2, iy1 = sill + h - fw / 2;                     // espacio libre
+  if (ix1 > ix0 && iy1 > sill) {
+    if (mode === 'none') { g.fillStyle = '#1b2a3a'; g.fillRect(X(ix0), Y(iy1), (ix1 - ix0) * s, (iy1 - sill) * s); }
+    else {
+      g.fillStyle = '#a67c52'; g.fillRect(X(ix0), Y(iy1), (ix1 - ix0) * s, (iy1 - sill) * s);
+      g.strokeStyle = '#7a5a38'; g.lineWidth = 1; g.strokeRect(X(ix0) + 6, Y(iy1) + 6, (ix1 - ix0) * s - 12, (iy1 - sill) * s - 12);
+      if (mode === 'double') { g.strokeStyle = '#3a2a18'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(0), Y(iy1)); g.lineTo(X(0), Y(sill)); g.stroke(); }
+    }
+  }
+  g.strokeStyle = '#94a3b8'; g.lineWidth = 1; g.beginPath(); g.moveTo(X(-wallW / 2) - 10, gy); g.lineTo(X(wallW / 2) + 10, gy); g.stroke(); // suelo
+  // cotas
+  g.strokeStyle = '#22d3ee'; g.fillStyle = '#22d3ee';
+  g.beginPath(); g.moveTo(X(-w / 2), gy + 16); g.lineTo(X(w / 2), gy + 16); g.stroke();
+  g.fillText(`${+w.toFixed(2)} m`, X(0), gy + 30);
+  const dxr = X(w / 2) + Math.max(18, fw * s + 12);
+  g.beginPath(); g.moveTo(dxr, Y(sill)); g.lineTo(dxr, Y(sill + h)); g.stroke();
+  g.save(); g.translate(dxr + 14, Y(sill + h / 2)); g.rotate(-Math.PI / 2); g.fillText(`${+h.toFixed(2)} m`, 0, 0); g.restore();
+  if (sill > 0) {
+    const dxl = X(-w / 2) - 18;
+    g.beginPath(); g.moveTo(dxl, gy); g.lineTo(dxl, Y(sill)); g.stroke();
+    g.save(); g.translate(dxl - 8, Y(sill / 2)); g.rotate(-Math.PI / 2); g.fillText(`alféizar ${+sill.toFixed(2)}`, 0, 0); g.restore();
+  }
+
+  // ---------- PLANTA ----------
+  const pw = W - ew, pcx = ew + pw / 2, pcy = H * 0.42;
+  const sp = Math.min((pw - 30) / (w + 1.4), (H - 90) / (w + depth + 0.8));
+  g.fillStyle = '#64748b'; g.fillText('PLANTA (esquema)', pcx, 16);
+  const PX = (x) => pcx + x * sp, PY = (z) => pcy + z * sp;
+  g.fillStyle = '#3b4252';
+  g.fillRect(PX(-w / 2 - 0.7), PY(-depth / 2), (0.7 + 0) * sp, depth * sp);
+  g.fillRect(PX(w / 2), PY(-depth / 2), 0.7 * sp, depth * sp);
+  g.fillStyle = '#4a2e15';
+  g.fillRect(PX(-w / 2 - fw / 2), PY(-depth / 2), fw * sp, depth * sp);
+  g.fillRect(PX(w / 2 - fw / 2), PY(-depth / 2), fw * sp, depth * sp);
+  if (mode !== 'none') {
+    const dirY = t.swing === 'out' ? -1 : 1;
+    const leaf = (hx, side, L) => {
+      const ex = hx + side * L * Math.cos(ang), ey = dirY * L * Math.sin(ang);
+      g.strokeStyle = '#a67c52'; g.lineWidth = Math.max(3, 0.08 * sp);
+      g.beginPath(); g.moveTo(PX(hx), PY(0)); g.lineTo(PX(ex), PY(ey)); g.stroke();
+      g.strokeStyle = '#ef4444'; g.lineWidth = 1; g.setLineDash([4, 4]);
+      g.beginPath(); g.arc(PX(hx), PY(0), L * sp, side > 0 ? 0 : Math.PI, side > 0 ? dirY * ang : Math.PI - dirY * ang, (side > 0) === (dirY < 0)); g.stroke();
+      g.setLineDash([]);
+    };
+    if (mode === 'double') { leaf(-w / 2, 1, w / 2); leaf(w / 2, -1, w / 2); }
+    else if (t.hinge === 'right') leaf(w / 2, -1, w); else leaf(-w / 2, 1, w);
+  }
+  g.fillStyle = '#94a3b8'; g.fillText(t.swing === 'out' ? '↑ afuera' : '↓ adentro', pcx, H - 12);
+}
+
+// =====================================================================
+//  ARRANQUE
+// =====================================================================
+loadLocal();
+hist = [snapshot()]; histIdx = 0;
+el('level-input').value = activeLevel;
+resize(); setTool('sala'); updateHistButtons();
+</script>
+</body>
+</html>
