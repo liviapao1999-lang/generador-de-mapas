@@ -1,31 +1,36 @@
 # Generador de mapas
 
-Editor 2D de planos (castillos / mapas) con cuadrícula de **10 cm**.
+Editor 2D + visor 3D de planos con cuadrícula de **10 cm**.
 
-## Abrir el editor
+## Archivos
 
-Abre [editor.html](editor.html) en el navegador (doble clic o arrastra el archivo).
+| Archivo | Descripción |
+|---------|-------------|
+| `editor.html` / `index.html` | Editor 2D |
+| `main.js` | Visor 3D (Three.js) |
+| `mapa.js` | Construcción 3D del mapa |
 
-También puedes servirlo localmente:
+## Editor
+
+Abre `editor.html` en el navegador.
+
+- Cuadrícula 10×10 cm
+- Salas/muros/bloques por celdas
+- Altura libre (Y)
+- Selección múltiple y borrado en grupo
+- Diseño de puertas
+- Importar / exportar JSON
+
+## Visor 3D
+
+Sirve la carpeta localmente (módulos ES):
 
 ```bash
 npx serve .
 ```
 
-## Funciones principales
+El visor lee el mapa desde `localStorage` (`castillo-v20`) o `mapa.json`.
 
-- Cuadrícula de 10×10 cm
-- Salas, muros y bloques construidos por celdas
-- Altura libre (input Y)
-- Selección múltiple (Shift+clic o caja) y borrado en grupo
-- Diseño de puertas
-- Importar / exportar JSON
-- Deshacer / rehacer
+## Repo
 
-## Uso rápido
-
-1. Elige altura **Y** en la barra superior
-2. **Suelo**: arrastra un rectángulo → marco de bloques
-3. **Bloques**: pinta celdas; Shift+clic borra
-4. **Seleccionar**: clic, Shift+clic o arrastra caja; Supr elimina
-5. **Nuevo**: limpia el mapa
+https://github.com/liviapao1999-lang/generador-de-mapas
